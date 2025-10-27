@@ -32,6 +32,9 @@ class ActivityLogs extends Table {
 
   // 登録時刻
   DateTimeColumn get createdAt => dateTime()();
+
+  // アップロード日時（アップロードされていない場合はnull）
+  DateTimeColumn get uploadedAt => dateTime().nullable()();
 }
 
 // データベースクラス
@@ -40,7 +43,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   // スキーマ変更時のマイグレーション処理
   @override
@@ -54,6 +57,10 @@ class AppDatabase extends _$AppDatabase {
           // バージョン2へのマイグレーション：既存データをクリア
           await m.deleteTable('activity_logs');
           await m.createTable(activityLogs);
+        }
+        if (from < 3) {
+          // バージョン3へのマイグレーション：uploadedAtカラムを追加
+          await m.addColumn(activityLogs, activityLogs.uploadedAt);
         }
       },
     );
@@ -121,6 +128,36 @@ class AppDatabase extends _$AppDatabase {
   // ログを更新
   Future<bool> updateLog(ActivityLog log) {
     return update(activityLogs).replace(log);
+  }
+
+  // ログのアップロード日時を更新
+  Future<int> markAsUploaded(int id) {
+    return (update(activityLogs)..where((t) => t.id.equals(id))).write(
+      ActivityLogsCompanion(
+        uploadedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  // 未アップロードのログを取得
+  Future<List<ActivityLog>> getUnuploadedLogs() {
+    return (select(activityLogs)
+          ..where((t) => t.uploadedAt.isNull())
+          ..orderBy([
+            (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
+          ]))
+        .get();
+  }
+
+  // アップロード済みのログを取得
+  Future<List<ActivityLog>> getUploadedLogs() {
+    return (select(activityLogs)
+          ..where((t) => t.uploadedAt.isNotNull())
+          ..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.uploadedAt, mode: OrderingMode.desc)
+          ]))
+        .get();
   }
 }
 

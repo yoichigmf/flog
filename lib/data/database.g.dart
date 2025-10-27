@@ -88,6 +88,17 @@ class $ActivityLogsTable extends ActivityLogs
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _uploadedAtMeta = const VerificationMeta(
+    'uploadedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> uploadedAt = GeneratedColumn<DateTime>(
+    'uploaded_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -97,6 +108,7 @@ class $ActivityLogsTable extends ActivityLogs
     latitude,
     longitude,
     createdAt,
+    uploadedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -154,6 +166,12 @@ class $ActivityLogsTable extends ActivityLogs
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('uploaded_at')) {
+      context.handle(
+        _uploadedAtMeta,
+        uploadedAt.isAcceptableOrUnknown(data['uploaded_at']!, _uploadedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -191,6 +209,10 @@ class $ActivityLogsTable extends ActivityLogs
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      uploadedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}uploaded_at'],
+      ),
     );
   }
 
@@ -208,6 +230,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   final double? latitude;
   final double? longitude;
   final DateTime createdAt;
+  final DateTime? uploadedAt;
   const ActivityLog({
     required this.id,
     this.textContent,
@@ -216,6 +239,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
     this.latitude,
     this.longitude,
     required this.createdAt,
+    this.uploadedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -237,6 +261,9 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
       map['longitude'] = Variable<double>(longitude);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || uploadedAt != null) {
+      map['uploaded_at'] = Variable<DateTime>(uploadedAt);
+    }
     return map;
   }
 
@@ -259,6 +286,9 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
           ? const Value.absent()
           : Value(longitude),
       createdAt: Value(createdAt),
+      uploadedAt: uploadedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(uploadedAt),
     );
   }
 
@@ -275,6 +305,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
       latitude: serializer.fromJson<double?>(json['latitude']),
       longitude: serializer.fromJson<double?>(json['longitude']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      uploadedAt: serializer.fromJson<DateTime?>(json['uploadedAt']),
     );
   }
   @override
@@ -288,6 +319,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
       'latitude': serializer.toJson<double?>(latitude),
       'longitude': serializer.toJson<double?>(longitude),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'uploadedAt': serializer.toJson<DateTime?>(uploadedAt),
     };
   }
 
@@ -299,6 +331,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
     Value<double?> latitude = const Value.absent(),
     Value<double?> longitude = const Value.absent(),
     DateTime? createdAt,
+    Value<DateTime?> uploadedAt = const Value.absent(),
   }) => ActivityLog(
     id: id ?? this.id,
     textContent: textContent.present ? textContent.value : this.textContent,
@@ -307,6 +340,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
     latitude: latitude.present ? latitude.value : this.latitude,
     longitude: longitude.present ? longitude.value : this.longitude,
     createdAt: createdAt ?? this.createdAt,
+    uploadedAt: uploadedAt.present ? uploadedAt.value : this.uploadedAt,
   );
   ActivityLog copyWithCompanion(ActivityLogsCompanion data) {
     return ActivityLog(
@@ -319,6 +353,9 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
       latitude: data.latitude.present ? data.latitude.value : this.latitude,
       longitude: data.longitude.present ? data.longitude.value : this.longitude,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      uploadedAt: data.uploadedAt.present
+          ? data.uploadedAt.value
+          : this.uploadedAt,
     );
   }
 
@@ -331,7 +368,8 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
           ..write('fileName: $fileName, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('uploadedAt: $uploadedAt')
           ..write(')'))
         .toString();
   }
@@ -345,6 +383,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
     latitude,
     longitude,
     createdAt,
+    uploadedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -356,7 +395,8 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
           other.fileName == this.fileName &&
           other.latitude == this.latitude &&
           other.longitude == this.longitude &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.uploadedAt == this.uploadedAt);
 }
 
 class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
@@ -367,6 +407,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   final Value<double?> latitude;
   final Value<double?> longitude;
   final Value<DateTime> createdAt;
+  final Value<DateTime?> uploadedAt;
   const ActivityLogsCompanion({
     this.id = const Value.absent(),
     this.textContent = const Value.absent(),
@@ -375,6 +416,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.uploadedAt = const Value.absent(),
   });
   ActivityLogsCompanion.insert({
     this.id = const Value.absent(),
@@ -384,6 +426,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
     required DateTime createdAt,
+    this.uploadedAt = const Value.absent(),
   }) : createdAt = Value(createdAt);
   static Insertable<ActivityLog> custom({
     Expression<int>? id,
@@ -393,6 +436,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
     Expression<double>? latitude,
     Expression<double>? longitude,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? uploadedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -402,6 +446,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       if (createdAt != null) 'created_at': createdAt,
+      if (uploadedAt != null) 'uploaded_at': uploadedAt,
     });
   }
 
@@ -413,6 +458,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
     Value<double?>? latitude,
     Value<double?>? longitude,
     Value<DateTime>? createdAt,
+    Value<DateTime?>? uploadedAt,
   }) {
     return ActivityLogsCompanion(
       id: id ?? this.id,
@@ -422,6 +468,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       createdAt: createdAt ?? this.createdAt,
+      uploadedAt: uploadedAt ?? this.uploadedAt,
     );
   }
 
@@ -449,6 +496,9 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (uploadedAt.present) {
+      map['uploaded_at'] = Variable<DateTime>(uploadedAt.value);
+    }
     return map;
   }
 
@@ -461,7 +511,8 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
           ..write('fileName: $fileName, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('uploadedAt: $uploadedAt')
           ..write(')'))
         .toString();
   }
@@ -487,6 +538,7 @@ typedef $$ActivityLogsTableCreateCompanionBuilder =
       Value<double?> latitude,
       Value<double?> longitude,
       required DateTime createdAt,
+      Value<DateTime?> uploadedAt,
     });
 typedef $$ActivityLogsTableUpdateCompanionBuilder =
     ActivityLogsCompanion Function({
@@ -497,6 +549,7 @@ typedef $$ActivityLogsTableUpdateCompanionBuilder =
       Value<double?> latitude,
       Value<double?> longitude,
       Value<DateTime> createdAt,
+      Value<DateTime?> uploadedAt,
     });
 
 class $$ActivityLogsTableFilterComposer
@@ -540,6 +593,11 @@ class $$ActivityLogsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -587,6 +645,11 @@ class $$ActivityLogsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ActivityLogsTableAnnotationComposer
@@ -620,6 +683,11 @@ class $$ActivityLogsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get uploadedAt => $composableBuilder(
+    column: $table.uploadedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$ActivityLogsTableTableManager
@@ -660,6 +728,7 @@ class $$ActivityLogsTableTableManager
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> uploadedAt = const Value.absent(),
               }) => ActivityLogsCompanion(
                 id: id,
                 textContent: textContent,
@@ -668,6 +737,7 @@ class $$ActivityLogsTableTableManager
                 latitude: latitude,
                 longitude: longitude,
                 createdAt: createdAt,
+                uploadedAt: uploadedAt,
               ),
           createCompanionCallback:
               ({
@@ -678,6 +748,7 @@ class $$ActivityLogsTableTableManager
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
                 required DateTime createdAt,
+                Value<DateTime?> uploadedAt = const Value.absent(),
               }) => ActivityLogsCompanion.insert(
                 id: id,
                 textContent: textContent,
@@ -686,6 +757,7 @@ class $$ActivityLogsTableTableManager
                 latitude: latitude,
                 longitude: longitude,
                 createdAt: createdAt,
+                uploadedAt: uploadedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

@@ -102,7 +102,7 @@ lib/
 ```
 
 ### データベーススキーマ
-**ActivityLogsテーブル (Drift) - Schema Version 2**
+**ActivityLogsテーブル (Drift) - Schema Version 3**
 - `id`: 主キー（自動生成）
 - `textContent`: テキストコンテンツ（**すべてのログで利用可能**、nullable）
 - `mediaType`: メディアタイプ（audio, image, video）（nullable - nullの場合はテキストのみ）
@@ -110,12 +110,16 @@ lib/
 - `latitude`: 緯度（位置情報、nullable）
 - `longitude`: 経度（位置情報、nullable）
 - `createdAt`: 登録日時（自動設定）
+- `uploadedAt`: アップロード日時（nullable、アップロード未実施の場合はnull）
 
 **重要な設計変更:**
 - **Schema V1からV2への変更**: `logType`を廃止し、`mediaType`に変更
 - **テキストはすべてのログで利用可能**: テキストのみ、またはメディア+テキストの組み合わせが可能
 - **MediaType enum**: audio, image, video（textは削除 - nullで表現）
-- **マイグレーション**: V1→V2でテーブルを再作成（既存データは削除）
+- **Schema V2からV3への変更**: `uploadedAt`カラムを追加（アップロード機能の準備）
+- **マイグレーション履歴**:
+  - V1→V2: テーブルを再作成（既存データは削除）
+  - V2→V3: `uploadedAt`カラムを追加（既存データは保持）
 
 ### 主要機能
 1. **ログ記録**
@@ -143,6 +147,15 @@ lib/
    - **デスクトップ（Windows）**: カメラ以外の全機能利用可能
    - **Web**: ネイティブ機能制限のため非推奨（録音、カメラ、位置情報に制限あり）
    - プラットフォーム検出により適切なUIを表示
+
+5. **アップロード管理**（準備完了）
+   - `uploadedAt`カラムでアップロード状態を管理
+   - **未アップロード**: `uploadedAt`がnullのログ
+   - **アップロード済み**: `uploadedAt`に日時が記録されたログ
+   - **提供メソッド**:
+     - `markAsUploaded(int id)`: ログをアップロード済みとしてマーク
+     - `getUnuploadedLogs()`: 未アップロードのログを取得
+     - `getUploadedLogs()`: アップロード済みのログを取得
 
 ### UI/UX設計の重要ポイント
 
@@ -259,6 +272,20 @@ bool get _isMobilePlatform {
 - 「終了(破棄)」ボタン: 録音をキャンセルしてテキスト入力に戻る
 - 「完了(保存)」ボタン: 録音を保存してログに追加
 - リアルタイムで録音時間を表示
+
+### 5. アップロード日時カラムの追加（Schema V3）
+**目的**: 将来のアップロード機能実装の準備
+**実装内容**:
+- `uploadedAt`カラムを追加（DateTime型、nullable）
+- スキーマバージョンを2から3に更新
+- マイグレーション処理を実装（既存データを保持したまま新カラムを追加）
+- アップロード管理用メソッドを追加:
+  ```dart
+  Future<int> markAsUploaded(int id)  // ログをアップロード済みとしてマーク
+  Future<List<ActivityLog>> getUnuploadedLogs()  // 未アップロードのログを取得
+  Future<List<ActivityLog>> getUploadedLogs()  // アップロード済みのログを取得
+  ```
+**注意**: アプリ再起動時にマイグレーションが自動実行され、既存のログに`uploadedAt`カラムが追加される（初期値null）
 
 ## プラットフォーム固有の注意事項
 
