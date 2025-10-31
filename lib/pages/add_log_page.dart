@@ -4,11 +4,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/database.dart';
 import '../services/file_service.dart';
 import '../services/location_service.dart';
 import '../services/audio_recorder_service.dart';
+import '../services/sheets_upload_service.dart';
 
 class AddLogPage extends StatefulWidget {
   final AppDatabase database;
@@ -48,6 +50,34 @@ class _AddLogPageState extends State<AddLogPage> {
     _textController.dispose();
     _recordingTimer?.cancel();
     super.dispose();
+  }
+
+  /// バックグラウンドでログをアップロード（UIをブロックしない）
+  void _uploadLogInBackground(int logId, String spreadsheetId) async {
+    try {
+      // データベースから保存したログを直接取得
+      final logs = await widget.database.getAllLogs();
+      final savedLog = logs.firstWhere((log) => log.id == logId);
+
+      await SheetsUploadService.uploadSingleLog(
+        database: widget.database,
+        log: savedLog,
+        spreadsheetId: spreadsheetId,
+      );
+
+      // アップロード成功
+      print('バックグラウンドアップロード成功: ログID=$logId');
+    } catch (e) {
+      // ネットワークエラー時：自動的に手動モードに切り替え
+      print('バックグラウンドアップロードエラー: $e');
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('auto_upload_enabled', false);
+        print('自動アップロードモードを無効にしました');
+      } catch (prefsError) {
+        print('設定の保存エラー: $prefsError');
+      }
+    }
   }
 
   // 位置情報を取得
@@ -237,7 +267,7 @@ class _AddLogPageState extends State<AddLogPage> {
       }
 
       // データベースに保存
-      await widget.database.addLog(
+      final logId = await widget.database.addLog(
         textContent: textContent,
         mediaType: _mediaType,
         fileName: fileName,
@@ -245,10 +275,36 @@ class _AddLogPageState extends State<AddLogPage> {
         longitude: _locationData?.longitude,
       );
 
+      // 自動アップロード設定をチェック
+      final prefs = await SharedPreferences.getInstance();
+      final autoUploadEnabled = prefs.getBool('auto_upload_enabled') ?? false;
+      final spreadsheetId = prefs.getString('spreadsheet_id');
+
+      if (autoUploadEnabled && spreadsheetId != null && spreadsheetId.isNotEmpty) {
+        // 自動アップロードモード：バックグラウンドで1件のログをアップロード
+        // UIをブロックしないように即座にメッセージを表示して画面を閉じる
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(
+            content: Text('ログを保存しました（バックグラウンドでアップロード中...）'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ));
+        }
+
+        // バックグラウンドでアップロード処理を実行（UIをブロックしない）
+        _uploadLogInBackground(logId, spreadsheetId);
+      } else {
+        // 手動モード：ローカルに保存のみ
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('ログを保存しました')));
+        }
+      }
+
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('ログを保存しました')));
         Navigator.of(context).pop(true);
       }
     } catch (e) {

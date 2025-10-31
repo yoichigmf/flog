@@ -57,11 +57,22 @@ dependencies:
   # Date formatting
   intl: ^0.19.0
 
+  # Timezone handling
+  timezone: ^0.9.4
+
   # URL launcher for opening maps
   url_launcher: ^6.3.1
 
   # Audio recording
   record: ^6.1.2
+
+  # Google Sign-In and Sheets API
+  google_sign_in: ^6.2.2
+  googleapis: ^13.2.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.12
+
+  # Shared preferences for storing settings
+  shared_preferences: ^2.3.3
 
 dev_dependencies:
   flutter_test:
@@ -78,6 +89,9 @@ dev_dependencies:
   drift_dev: ^2.22.0
   build_runner: ^2.4.13
 
+  # App icon generator
+  flutter_launcher_icons: ^0.13.1
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -88,6 +102,14 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+# Flutter Launcher Icons configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon_adaptive.png"
 
   # To add assets to your application, add an assets section, like this:
   # assets:

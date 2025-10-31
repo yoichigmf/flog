@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 import 'data/database.dart';
 import 'pages/log_list_page.dart';
 
 void main() {
+  // タイムゾーンデータベースを初期化
+  tz.initializeTimeZones();
+
   runApp(const MyApp());
 }
 

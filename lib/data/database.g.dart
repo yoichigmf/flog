@@ -22,6 +22,16 @@ class $ActivityLogsTable extends ActivityLogs
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
+  static const VerificationMeta _uuidMeta = const VerificationMeta('uuid');
+  @override
+  late final GeneratedColumn<String> uuid = GeneratedColumn<String>(
+    'uuid',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _textContentMeta = const VerificationMeta(
     'textContent',
   );
@@ -102,6 +112,7 @@ class $ActivityLogsTable extends ActivityLogs
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    uuid,
     textContent,
     mediaType,
     fileName,
@@ -124,6 +135,12 @@ class $ActivityLogsTable extends ActivityLogs
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('uuid')) {
+      context.handle(
+        _uuidMeta,
+        uuid.isAcceptableOrUnknown(data['uuid']!, _uuidMeta),
+      );
     }
     if (data.containsKey('text_content')) {
       context.handle(
@@ -185,6 +202,10 @@ class $ActivityLogsTable extends ActivityLogs
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      uuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}uuid'],
+      ),
       textContent: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}text_content'],
@@ -224,6 +245,7 @@ class $ActivityLogsTable extends ActivityLogs
 
 class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   final int id;
+  final String? uuid;
   final String? textContent;
   final String? mediaType;
   final String? fileName;
@@ -233,6 +255,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   final DateTime? uploadedAt;
   const ActivityLog({
     required this.id,
+    this.uuid,
     this.textContent,
     this.mediaType,
     this.fileName,
@@ -245,6 +268,9 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    if (!nullToAbsent || uuid != null) {
+      map['uuid'] = Variable<String>(uuid);
+    }
     if (!nullToAbsent || textContent != null) {
       map['text_content'] = Variable<String>(textContent);
     }
@@ -270,6 +296,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   ActivityLogsCompanion toCompanion(bool nullToAbsent) {
     return ActivityLogsCompanion(
       id: Value(id),
+      uuid: uuid == null && nullToAbsent ? const Value.absent() : Value(uuid),
       textContent: textContent == null && nullToAbsent
           ? const Value.absent()
           : Value(textContent),
@@ -299,6 +326,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ActivityLog(
       id: serializer.fromJson<int>(json['id']),
+      uuid: serializer.fromJson<String?>(json['uuid']),
       textContent: serializer.fromJson<String?>(json['textContent']),
       mediaType: serializer.fromJson<String?>(json['mediaType']),
       fileName: serializer.fromJson<String?>(json['fileName']),
@@ -313,6 +341,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'uuid': serializer.toJson<String?>(uuid),
       'textContent': serializer.toJson<String?>(textContent),
       'mediaType': serializer.toJson<String?>(mediaType),
       'fileName': serializer.toJson<String?>(fileName),
@@ -325,6 +354,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
 
   ActivityLog copyWith({
     int? id,
+    Value<String?> uuid = const Value.absent(),
     Value<String?> textContent = const Value.absent(),
     Value<String?> mediaType = const Value.absent(),
     Value<String?> fileName = const Value.absent(),
@@ -334,6 +364,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
     Value<DateTime?> uploadedAt = const Value.absent(),
   }) => ActivityLog(
     id: id ?? this.id,
+    uuid: uuid.present ? uuid.value : this.uuid,
     textContent: textContent.present ? textContent.value : this.textContent,
     mediaType: mediaType.present ? mediaType.value : this.mediaType,
     fileName: fileName.present ? fileName.value : this.fileName,
@@ -345,6 +376,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   ActivityLog copyWithCompanion(ActivityLogsCompanion data) {
     return ActivityLog(
       id: data.id.present ? data.id.value : this.id,
+      uuid: data.uuid.present ? data.uuid.value : this.uuid,
       textContent: data.textContent.present
           ? data.textContent.value
           : this.textContent,
@@ -363,6 +395,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   String toString() {
     return (StringBuffer('ActivityLog(')
           ..write('id: $id, ')
+          ..write('uuid: $uuid, ')
           ..write('textContent: $textContent, ')
           ..write('mediaType: $mediaType, ')
           ..write('fileName: $fileName, ')
@@ -377,6 +410,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
   @override
   int get hashCode => Object.hash(
     id,
+    uuid,
     textContent,
     mediaType,
     fileName,
@@ -390,6 +424,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
       identical(this, other) ||
       (other is ActivityLog &&
           other.id == this.id &&
+          other.uuid == this.uuid &&
           other.textContent == this.textContent &&
           other.mediaType == this.mediaType &&
           other.fileName == this.fileName &&
@@ -401,6 +436,7 @@ class ActivityLog extends DataClass implements Insertable<ActivityLog> {
 
 class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   final Value<int> id;
+  final Value<String?> uuid;
   final Value<String?> textContent;
   final Value<String?> mediaType;
   final Value<String?> fileName;
@@ -410,6 +446,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   final Value<DateTime?> uploadedAt;
   const ActivityLogsCompanion({
     this.id = const Value.absent(),
+    this.uuid = const Value.absent(),
     this.textContent = const Value.absent(),
     this.mediaType = const Value.absent(),
     this.fileName = const Value.absent(),
@@ -420,6 +457,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   });
   ActivityLogsCompanion.insert({
     this.id = const Value.absent(),
+    this.uuid = const Value.absent(),
     this.textContent = const Value.absent(),
     this.mediaType = const Value.absent(),
     this.fileName = const Value.absent(),
@@ -430,6 +468,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   }) : createdAt = Value(createdAt);
   static Insertable<ActivityLog> custom({
     Expression<int>? id,
+    Expression<String>? uuid,
     Expression<String>? textContent,
     Expression<String>? mediaType,
     Expression<String>? fileName,
@@ -440,6 +479,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (uuid != null) 'uuid': uuid,
       if (textContent != null) 'text_content': textContent,
       if (mediaType != null) 'media_type': mediaType,
       if (fileName != null) 'file_name': fileName,
@@ -452,6 +492,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
 
   ActivityLogsCompanion copyWith({
     Value<int>? id,
+    Value<String?>? uuid,
     Value<String?>? textContent,
     Value<String?>? mediaType,
     Value<String?>? fileName,
@@ -462,6 +503,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   }) {
     return ActivityLogsCompanion(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       textContent: textContent ?? this.textContent,
       mediaType: mediaType ?? this.mediaType,
       fileName: fileName ?? this.fileName,
@@ -477,6 +519,9 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (uuid.present) {
+      map['uuid'] = Variable<String>(uuid.value);
     }
     if (textContent.present) {
       map['text_content'] = Variable<String>(textContent.value);
@@ -506,6 +551,7 @@ class ActivityLogsCompanion extends UpdateCompanion<ActivityLog> {
   String toString() {
     return (StringBuffer('ActivityLogsCompanion(')
           ..write('id: $id, ')
+          ..write('uuid: $uuid, ')
           ..write('textContent: $textContent, ')
           ..write('mediaType: $mediaType, ')
           ..write('fileName: $fileName, ')
@@ -532,6 +578,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$ActivityLogsTableCreateCompanionBuilder =
     ActivityLogsCompanion Function({
       Value<int> id,
+      Value<String?> uuid,
       Value<String?> textContent,
       Value<String?> mediaType,
       Value<String?> fileName,
@@ -543,6 +590,7 @@ typedef $$ActivityLogsTableCreateCompanionBuilder =
 typedef $$ActivityLogsTableUpdateCompanionBuilder =
     ActivityLogsCompanion Function({
       Value<int> id,
+      Value<String?> uuid,
       Value<String?> textContent,
       Value<String?> mediaType,
       Value<String?> fileName,
@@ -563,6 +611,11 @@ class $$ActivityLogsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uuid => $composableBuilder(
+    column: $table.uuid,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -616,6 +669,11 @@ class $$ActivityLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get uuid => $composableBuilder(
+    column: $table.uuid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get textContent => $composableBuilder(
     column: $table.textContent,
     builder: (column) => ColumnOrderings(column),
@@ -663,6 +721,9 @@ class $$ActivityLogsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get uuid =>
+      $composableBuilder(column: $table.uuid, builder: (column) => column);
 
   GeneratedColumn<String> get textContent => $composableBuilder(
     column: $table.textContent,
@@ -722,6 +783,7 @@ class $$ActivityLogsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<String?> uuid = const Value.absent(),
                 Value<String?> textContent = const Value.absent(),
                 Value<String?> mediaType = const Value.absent(),
                 Value<String?> fileName = const Value.absent(),
@@ -731,6 +793,7 @@ class $$ActivityLogsTableTableManager
                 Value<DateTime?> uploadedAt = const Value.absent(),
               }) => ActivityLogsCompanion(
                 id: id,
+                uuid: uuid,
                 textContent: textContent,
                 mediaType: mediaType,
                 fileName: fileName,
@@ -742,6 +805,7 @@ class $$ActivityLogsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<String?> uuid = const Value.absent(),
                 Value<String?> textContent = const Value.absent(),
                 Value<String?> mediaType = const Value.absent(),
                 Value<String?> fileName = const Value.absent(),
@@ -751,6 +815,7 @@ class $$ActivityLogsTableTableManager
                 Value<DateTime?> uploadedAt = const Value.absent(),
               }) => ActivityLogsCompanion.insert(
                 id: id,
+                uuid: uuid,
                 textContent: textContent,
                 mediaType: mediaType,
                 fileName: fileName,

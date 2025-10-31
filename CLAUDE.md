@@ -12,6 +12,8 @@ Dart SDK ^3.9.2を使用した「flog」というFlutterアプリケーション
 - **音声録音**: その場で録音できるモードがデフォルト
 - **プラットフォーム対応**: モバイルとデスクトップで適切なUIを表示
 - **完全オフライン**: ネットワーク不要で動作
+- **Google Sheets連携**: ログをGoogle Sheetsにアップロード
+- **Google Drive連携**: メディアファイルをGoogle Driveにアップロードし、URLをSheetsに記録
 
 ## 開発コマンド
 
@@ -92,24 +94,29 @@ lib/
 │   ├── database.dart      # Driftデータベース定義（ActivityLogsテーブル）
 │   └── database.g.dart    # Drift生成ファイル
 ├── services/
-│   ├── file_service.dart          # メディアファイル管理サービス
-│   ├── location_service.dart      # 位置情報取得サービス
-│   └── audio_recorder_service.dart # 音声録音サービス
+│   ├── file_service.dart           # メディアファイル管理サービス
+│   ├── location_service.dart       # 位置情報取得サービス
+│   ├── audio_recorder_service.dart # 音声録音サービス
+│   ├── google_auth_service.dart    # Google OAuth認証サービス
+│   ├── sheets_upload_service.dart  # Google Sheetsアップロードサービス
+│   └── drive_upload_service.dart   # Google Driveファイルアップロードサービス
 └── pages/
     ├── log_list_page.dart    # ログ一覧画面
     ├── add_log_page.dart     # ログ追加画面
-    └── log_detail_page.dart  # ログ詳細画面
+    ├── log_detail_page.dart  # ログ詳細画面
+    └── settings_page.dart    # 設定画面（Google認証、Spreadsheet ID設定）
 ```
 
 ### データベーススキーマ
-**ActivityLogsテーブル (Drift) - Schema Version 3**
+**ActivityLogsテーブル (Drift) - Schema Version 4**
 - `id`: 主キー（自動生成）
+- `uuid`: UUID（ログの一意識別子、アップロード時の重複チェックに使用）
 - `textContent`: テキストコンテンツ（**すべてのログで利用可能**、nullable）
 - `mediaType`: メディアタイプ（audio, image, video）（nullable - nullの場合はテキストのみ）
 - `fileName`: メディアファイル名（音声/画像/動画の場合、UUIDベース）
 - `latitude`: 緯度（位置情報、nullable）
 - `longitude`: 経度（位置情報、nullable）
-- `createdAt`: 登録日時（自動設定）
+- `createdAt`: 登録日時（UTC標準時で保存、表示時はローカルタイムゾーンに変換）
 - `uploadedAt`: アップロード日時（nullable、アップロード未実施の場合はnull）
 
 **重要な設計変更:**
@@ -117,9 +124,11 @@ lib/
 - **テキストはすべてのログで利用可能**: テキストのみ、またはメディア+テキストの組み合わせが可能
 - **MediaType enum**: audio, image, video（textは削除 - nullで表現）
 - **Schema V2からV3への変更**: `uploadedAt`カラムを追加（アップロード機能の準備）
+- **Schema V3からV4への変更**: `uuid`カラムを追加（重複チェック機能）
 - **マイグレーション履歴**:
   - V1→V2: テーブルを再作成（既存データは削除）
   - V2→V3: `uploadedAt`カラムを追加（既存データは保持）
+  - V3→V4: `uuid`カラムを追加、既存レコードにUUIDを生成
 
 ### 主要機能
 1. **ログ記録**
@@ -148,14 +157,31 @@ lib/
    - **Web**: ネイティブ機能制限のため非推奨（録音、カメラ、位置情報に制限あり）
    - プラットフォーム検出により適切なUIを表示
 
-5. **アップロード管理**（準備完了）
+5. **Google連携機能**
+   - **Google Sheets アップロード**:
+     - 未アップロードのログをGoogle Sheetsに一括アップロード
+     - UUID重複チェック機能（既存ログの検出と上書き確認）
+     - アップロード列: UUID、登録日時、テキスト、メディアタイプ、ファイル名、ファイルURL、緯度、経度、アップロード日時、アップロードユーザー
+   - **Google Drive ファイルアップロード**:
+     - メディアファイル（音声、画像、動画）を自動的にGoogle Driveにアップロード
+     - Spreadsheetと同じフォルダ内の`files`サブフォルダに保存
+     - 共有リンク生成（リンクを知っている人全員が閲覧可能）
+     - ファイルURLをSpreadsheetに記録
+   - **設定項目**:
+     - Google Sign-In（Sheets & Drive API権限）
+     - Spreadsheet ID設定
+   - **重要**: Google Cloud ConsoleでGoogle Drive APIを有効にする必要があります（詳細は`DRIVE_API_SETUP.md`参照）
+
+6. **アップロード管理**
    - `uploadedAt`カラムでアップロード状態を管理
+   - `uuid`カラムで重複チェック
    - **未アップロード**: `uploadedAt`がnullのログ
    - **アップロード済み**: `uploadedAt`に日時が記録されたログ
    - **提供メソッド**:
      - `markAsUploaded(int id)`: ログをアップロード済みとしてマーク
      - `getUnuploadedLogs()`: 未アップロードのログを取得
      - `getUploadedLogs()`: アップロード済みのログを取得
+     - `checkDuplicateLogs()`: UUID重複チェック
 
 ### UI/UX設計の重要ポイント
 
@@ -286,6 +312,81 @@ bool get _isMobilePlatform {
   Future<List<ActivityLog>> getUploadedLogs()  // アップロード済みのログを取得
   ```
 **注意**: アプリ再起動時にマイグレーションが自動実行され、既存のログに`uploadedAt`カラムが追加される（初期値null）
+
+### 6. Google Sheets連携機能の実装
+**目的**: ログデータをGoogle Spreadsheetsにアップロード
+**実装内容**:
+
+#### 追加パッケージ
+- `google_sign_in: ^6.2.2` - Google OAuth認証
+- `googleapis: ^13.2.0` - Google Sheets API
+- `extension_google_sign_in_as_googleapis_auth: ^2.0.12` - 認証ブリッジ
+- `shared_preferences: ^2.3.3` - Spreadsheet ID保存
+
+#### 新規作成ファイル
+1. **`lib/services/google_auth_service.dart`**
+   - Google OAuth認証の管理
+   - Sheets APIインスタンスの取得
+   - サインイン/サインアウト機能
+
+2. **`lib/services/sheets_upload_service.dart`**
+   - Google Sheetsへのログアップロード
+   - 未アップロードログの一括アップロード
+   - Spreadsheet存在確認
+
+3. **`lib/pages/settings_page.dart`**
+   - Google認証UI
+   - Spreadsheet ID設定
+   - 設定の保存・読み込み
+
+4. **`GOOGLE_SETUP.md`**
+   - Google Cloud Consoleの設定手順書
+   - OAuth 2.0クライアントID作成手順
+   - トラブルシューティング
+
+#### 既存ファイルの更新
+- **`lib/pages/log_list_page.dart`**
+  - アップロードボタンを追加
+  - 設定画面へのナビゲーション追加
+  - 未アップロードログのアップロード処理
+
+- **`ios/Runner/Info.plist`**
+  - Google Sign-In用のURL Schemeを追加
+
+#### アップロードデータ形式
+Google Sheetsに以下の情報を記録：
+- **レコードID**: 元のデータベースレコードのID
+- **登録日時**: ログの作成日時
+- **テキスト**: テキストコンテンツ
+- **メディアタイプ**: audio/image/video
+- **ファイル名**: メディアファイル名
+- **緯度/経度**: 位置情報
+- **アップロード日時**: アップロード実行時の日時（全ログで同一）
+- **アップロードユーザー**: サインインしているGoogleアカウントのメールアドレス
+
+#### Google Cloud Consoleの設定
+**必要な情報**:
+- パッケージ名: `com.example.flog`
+- SHA-1フィンガープリント: `B9:FB:8F:D6:75:7F:62:45:11:53:FE:B5:DE:8D:A6:84:26:E7:27:EE`（デバッグ用）
+
+**設定手順**:
+1. Google Cloud Consoleでプロジェクト作成
+2. Google Sheets APIを有効化
+3. OAuth同意画面を設定（テストユーザー追加必須）
+4. Android用OAuth 2.0クライアントIDを作成
+5. 必要なスコープを追加: `https://www.googleapis.com/auth/spreadsheets`
+
+**使用方法**:
+1. アプリの設定画面でGoogleサインイン
+2. Google SheetsでSpreadsheetを作成
+3. シート名を「ActivityLogs」に変更
+4. Spreadsheet IDを設定画面に入力・保存
+5. ログ一覧画面の「アップロード」ボタンで未アップロードログをアップロード
+
+**トラブルシューティング**:
+- **403 access_denied**: OAuth同意画面でテストユーザーを追加
+- **400 Unable to parse range**: シート名を「ActivityLogs」に変更
+- **認証エラー**: SHA-1フィンガープリントとパッケージ名を確認
 
 ## プラットフォーム固有の注意事項
 

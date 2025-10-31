@@ -33,6 +33,15 @@ class FileService {
     return fileName;
   }
 
+  // 指定したファイル名でファイルを保存
+  static Future<void> saveFileWithName(File sourceFile, String fileName) async {
+    final logsDir = await getAppDirectory();
+    final destinationPath = p.join(logsDir.path, fileName);
+
+    // ファイルをコピー
+    await sourceFile.copy(destinationPath);
+  }
+
   // ファイル名からフルパスを取得
   static Future<String> getFilePath(String fileName) async {
     final logsDir = await getAppDirectory();

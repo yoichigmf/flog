@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 part 'database.g.dart';
 
@@ -14,6 +15,9 @@ enum MediaType {
 class ActivityLogs extends Table {
   // 主キー
   IntColumn get id => integer().autoIncrement()();
+
+  // UUID（ログの一意識別子、アップロード時のキーとして使用）
+  TextColumn get uuid => text().nullable().withDefault(const Constant(''))();
 
   // テキストコンテンツ（すべてのログで使用可能）
   TextColumn get textContent => text().nullable()();
@@ -43,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   // スキーマ変更時のマイグレーション処理
   @override
@@ -62,6 +66,29 @@ class AppDatabase extends _$AppDatabase {
           // バージョン3へのマイグレーション：uploadedAtカラムを追加
           await m.addColumn(activityLogs, activityLogs.uploadedAt);
         }
+        if (from < 4) {
+          // バージョン4へのマイグレーション：uuidカラムを追加
+          // ステップ1: nullable TEXT として追加
+          await customStatement(
+            'ALTER TABLE activity_logs ADD COLUMN uuid TEXT',
+          );
+
+          // ステップ2: 既存レコードにUUIDを生成して設定
+          final existingLogs = await customSelect(
+            'SELECT id FROM activity_logs',
+            readsFrom: {activityLogs},
+          ).get();
+
+          const uuidGenerator = Uuid();
+          for (final row in existingLogs) {
+            final id = row.read<int>('id');
+            await customUpdate(
+              'UPDATE activity_logs SET uuid = ? WHERE id = ?',
+              updates: {activityLogs},
+              variables: [Variable<String>(uuidGenerator.v4()), Variable<int>(id)],
+            );
+          }
+        }
       },
     );
   }
@@ -74,8 +101,10 @@ class AppDatabase extends _$AppDatabase {
     double? latitude,
     double? longitude,
   }) {
+    const uuidGenerator = Uuid();
     return into(activityLogs).insert(
       ActivityLogsCompanion.insert(
+        uuid: Value(uuidGenerator.v4()),
         textContent: Value(textContent),
         mediaType: Value(mediaType?.name),
         fileName: Value(fileName),
